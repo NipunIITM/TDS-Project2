@@ -371,7 +371,7 @@ def plot_to_base64(max_bytes=100000):
 llm = ChatGoogleGenerativeAI(
     model=os.getenv("GOOGLE_MODEL", "gemini-2.5-pro"),
     temperature=0,
-    google_api_key=os.getenv("GOOGLE_API_KEY")
+    google_api_key=os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
 )
 
 # Tools list for agent (LangChain tool decorator returns metadata for the LLM)
@@ -657,7 +657,15 @@ def run_agent_safely_unified(llm_input: str, pickle_path: str = None, type_map: 
                 elif expected in ("string", "base64"):
                     results_dict[k] = "" if v is None else str(v)
                 elif expected == "boolean":
-                    results_dict[k] = bool(v)  
+                    results_dict[k] = bool(v)
+
+        # >>> ADD THIS TINY FORMATTER (keeps dict order) <<<
+        try:
+            if re.search(r"json array of strings", llm_input, re.I):
+                return ["" if v is None else str(v) for v in results_dict.values()]
+        except Exception:
+            pass
+
         return results_dict
 
     except Exception as e:
@@ -692,6 +700,14 @@ async def analyze_get_info():
 
     })
 
+from fastapi.responses import FileResponse
+import os
+
+@app.get("/")
+async def read_index():
+    return FileResponse(os.path.join(os.path.dirname(__file__), "index.html"))
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=int(os.getenv("PORT", 8000)))
+
